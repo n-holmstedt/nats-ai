@@ -1,17 +1,23 @@
 package app
 
 import (
-  "context"
-  "github.com/henomis/lingoose/llm/ollama"
-  "github.com/henomis/lingoose/thread"
-  "github.com/nats-io/nats.go/micro"
-  "github.com/rs/xid"
-  "github.com/rs/zerolog/log"
+	"context"
+	"errors"
+
+	"github.com/henomis/lingoose/llm/ollama"
+	"github.com/henomis/lingoose/thread"
+	"github.com/nats-io/nats.go/micro"
+	"github.com/rs/xid"
+	"github.com/rs/zerolog/log"
 )
 
 const (
   ThreadIdHeader = "nats-thread-id"
   ModelHeader    = "nats-model"
+)
+
+var (
+    ErrMissingThreadId = errors.New("missing thread id")
 )
 
 func callRequestHandler(ts ThreadStore, endpoint string, defaultModel string) micro.Handler {
@@ -21,13 +27,16 @@ func callRequestHandler(ts ThreadStore, endpoint string, defaultModel string) mi
     var th *thread.Thread
     tid := req.Headers().Get(ThreadIdHeader)
     if tid == "" {
-      tid = xid.New().String()
-      th = thread.New()
+        tid = xid.New().String()
+        th = thread.New()
     } else {
       thrd, err := ts.GetThread(tid)
       if err != nil {
         _ = req.Error("THREAD_ERROR", err.Error(), nil)
-        return
+      }
+
+      if thrd == nil {
+        th = thread.New()
       }
 
       th = thrd
